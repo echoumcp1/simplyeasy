@@ -22,6 +22,15 @@ evalI (NatElim motive fZero fSucc res) env =
                 VNeutral n -> VNeutral (NNatElim (evalC motive env) fZeroVal fSuccVal n)
                 _ -> error "eval natElim internal err"
     in helper (evalC res env)
+evalI (VecElim a motive fNil fCons sz xs) env =
+    let fNilVal = evalC fNil env
+        fConsVal = evalC fCons env
+        helper nVal xsVal =
+            case xsVal of
+                VNil _ -> fNilVal
+                VCons _ sz x xs -> foldl vapp fConsVal [sz, x, xs, helper sz xs]
+                VNeutral n -> VNeutral (NVecElim (evalC a env) (evalC motive env) fNilVal fConsVal nVal n)
+        in helper (evalC sz env) (evalC xs env)
 
 vapp :: Value -> Value -> Value
 vapp (VLam f) v = f v

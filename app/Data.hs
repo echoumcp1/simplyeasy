@@ -17,6 +17,8 @@ data ITerm
     | ITerm :@: CTerm
     | Nat
     | NatElim CTerm CTerm CTerm CTerm
+    | Vec CTerm CTerm
+    | VecElim CTerm CTerm CTerm CTerm CTerm CTerm
     deriving (Show, Eq)
 
 data CTerm
@@ -24,6 +26,8 @@ data CTerm
     | Lam CTerm
     | Zero 
     | Succ CTerm
+    | Nil CTerm
+    | Cons CTerm CTerm CTerm CTerm
     deriving (Show, Eq)
 
 data Value
@@ -34,10 +38,14 @@ data Value
     | VNat
     | VZero
     | VSucc Value 
+    | VNil Value
+    | VCons Value Value Value Value
+    | VVec Value Value
 
 data Neutral
     = NPar Name
     | NApp Neutral Value
     | NNatElim Value Value Value Neutral
+    | NVecElim Value Value Value Value Value Neutral
 
 type Env = [Value]

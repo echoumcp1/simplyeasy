@@ -17,7 +17,7 @@ typeI i gamma (Ann cterm ty) =
        typeC i gamma cterm v
        return v
 typeI i gamma Star = return VStar
-typeI i gamma (Pi a b) = 
+typeI i gamma (Pi a b) =
     do typeC i gamma a VStar
        let v = evalC a []
        typeC (i + 1) ((Bound i, v) : gamma)
@@ -34,16 +34,37 @@ typeI i gamma (e1 :@: e2) =
                          return (f (evalC e2 []))
            _ -> throwError "illegal application"
 typeI i gamma Nat = return VStar
-typeI i gamma (NatElim motive fZero fSucc res) = 
+typeI i gamma (NatElim motive fZero fSucc res) =
     do typeC i gamma motive (VPi VNat (const VStar))
        let mVal = evalC motive []
        typeC i gamma fZero (mVal `vapp` VZero)
-       typeC i gamma fSucc 
-        (VPi VNat (\n -> 
+       typeC i gamma fSucc
+        (VPi VNat (\n ->
          VPi (mVal `vapp` n) (\_ -> mVal `vapp` VSucc n)))
        typeC i gamma res VNat
        let nVal = evalC res []
        return (mVal `vapp` nVal)
+typeI i gamma (Vec a n) =
+    do typeC i gamma a VStar
+       typeC i gamma n VNat
+       return VStar
+typeI i gamma (VecElim a motive fNil fCons sz vs) =
+    do  typeC i gamma a VStar
+        let aVal = evalC a []
+        typeC i gamma motive (VPi VNat (\n -> VPi (VVec aVal n) (const VStar)))
+        let mVal = evalC motive []
+        typeC i gamma fNil (foldl vapp mVal [VZero,VNil aVal])
+        typeC i gamma fCons
+            (VPi VNat (\n ->
+             VPi aVal (\y ->
+             VPi (VVec aVal n) (\ys ->
+             VPi (foldl vapp mVal [n,ys]) (\_ ->
+             foldl vapp mVal [VSucc n, VCons aVal n y ys])))))
+        typeC i gamma sz VNat
+        let nVal = evalC sz []
+        typeC i gamma vs (VVec aVal nVal)
+        let vsVal = evalC vs []
+        return (foldl vapp mVal [nVal, vsVal])
 
 typeC :: Int -> Context -> CTerm -> Type -> Result ()
 typeC i gamma (Inf e) v =
@@ -53,6 +74,19 @@ typeC i gamma (Lam e) (VPi v f) =
     typeC (i + 1) ((Bound i, v):gamma) (substC 0 (Par (Bound i)) e) (f (vpar (Bound i)))
 typeC i gamma Zero VNat = return ()
 typeC i gamma (Succ k) VNat = typeC i gamma k VNat
+typeC i gamma (Nil a) (VVec bVal VZero) =
+    do typeC i gamma a VStar
+       let aVal = evalC a []
+       unless (quote0 aVal == quote0 bVal) (throwError "type mismatch")
+typeC i gamma (Cons a sz x xs) (VVec bVal (VSucc k)) =
+    do typeC i gamma a VStar
+       let aVal = evalC a []
+       unless (quote0 aVal == quote0 bVal) (throwError "type mismatch")
+       typeC i gamma sz VNat
+       let nVal = evalC sz []
+       unless (quote0 nVal == quote0 k) (throwError "type mismatch")
+       typeC i gamma x aVal
+       typeC i gamma xs (VVec bVal k)
 typeC i gamma _ _ = throwError "type mismatch"
 
 
